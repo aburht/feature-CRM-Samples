@@ -1,0 +1,230 @@
+note.txt
+
+Thruba Nandhini <thruba.nandhini@gmail.com>
+12:45 AM (7 hours ago)
+to thruba.kesava-murthy
+
+CREATE TABLE user_roles (
+  id INT PRIMARY KEY IDENTITY(1,1),
+  user_id INT NOT NULL,
+  role_name VARCHAR(50) NOT NULL,
+  CONSTRAINT FK_user_roles_users FOREIGN KEY (user_id)
+    REFERENCES users (id)
+    ON DELETE CASCADE
+);
+
+CREATE TABLE permissions (
+  id INT PRIMARY KEY IDENTITY(1,1),
+  name VARCHAR(50) NOT NULL,
+  description VARCHAR(100)
+);
+
+CREATE TABLE user_role_permissions (
+  role_id INT NOT NULL,
+  permission_id INT NOT NULL,
+  CONSTRAINT PK_user_role_permissions PRIMARY KEY (role_id, permission_id),
+  CONSTRAINT FK_user_role_permissions_roles FOREIGN KEY (role_id)
+    REFERENCES user_roles (id)
+    ON DELETE CASCADE,
+  CONSTRAINT FK_user_role_permissions_permissions FOREIGN KEY (permission_id)
+    REFERENCES permissions (id)
+    ON DELETE CASCADE
+);
+
+INSERT INTO user_roles (user_id, role_name) VALUES (1, 'admin');
+INSERT INTO user_roles (user_id, role_name) VALUES (2, 'editor');
+
+INSERT INTO permissions (name, description) VALUES ('create', 'Create new resources');
+INSERT INTO permissions (name, description) VALUES ('read', 'Read existing resources');
+INSERT INTO permissions (name, description) VALUES ('update', 'Update existing resources');
+INSERT INTO permissions (name, description) VALUES ('delete', 'Delete existing resources');
+
+INSERT INTO user_role_permissions (role_id, permission_id) VALUES (1, 1); -- grant 'create' permission to 'admin' role
+INSERT INTO user_role_permissions (role_id, permission_id) VALUES (1, 2); -- grant 'read' permission to 'admin' role
+INSERT INTO user_role_permissions (role_id, permission_id) VALUES (1, 3); -- grant 'update' permission to 'admin' role
+INSERT INTO user_role_permissions (role_id, permission_id) VALUES (1, 4); -- grant 'delete' permission to 'admin' role
+
+INSERT INTO user_role_permissions (role_id, permission_id) VALUES (2, 2); -- grant 'read' permission to 'editor' role
+INSERT INTO user_role_permissions (role_id, permission_id) VALUES (2, 3); -- grant 'update' permission to 'editor' role
+
+To implement Role-Based Access Control (RBAC) in Node.js using Casbin and store the policy in a MSSQL database,
+
+Install the required packages:
+npm install casbin mssql
+
+--------
+Create a database table to store the Casbin policy. You can use the following SQL statement to create a table named casbin_policy:
+
+CREATE TABLE casbin_policy (
+  id INT PRIMARY KEY IDENTITY(1,1),
+  ptype VARCHAR(50) NOT NULL,
+  v0 VARCHAR(100) DEFAULT '',
+  v1 VARCHAR(100) DEFAULT '',
+  v2 VARCHAR(100) DEFAULT '',
+  v3 VARCHAR(100) DEFAULT '',
+  v4 VARCHAR(100) DEFAULT '',
+  v5 VARCHAR(100) DEFAULT ''
+)
+
+Load the Casbin policy from the database and instantiate a Casbin enforcer:
+const { newEnforcer } = require('casbin');
+
+async function loadPolicy() {
+  const result = await sql.query('SELECT * FROM casbin_policy');
+
+  const policy = result.recordset.map((row) => {
+    const [ptype, v0, v1, v2, v3, v4, v5] = Object.values(row);
+    return `${ptype},${v0},${v1},${v2},${v3},${v4},${v5}`;
+  });
+
+  const enforcer = await newEnforcer('model.conf', '');
+  await enforcer.initWithText(policy.join('\n'));
+
+  return enforcer;
+}
+
+Use the Casbin enforcer to enforce RBAC policies:
+
+javascript
+Copy code
+async function enforce(enforcer, subject, resource, action) {
+  const allowed = await enforcer.enforce(subject, resource, action);
+
+  if (allowed) {
+    console.log(`Access granted: ${subject} can ${action} ${resource}`);
+  } else {
+    console.log(`Access denied: ${subject} cannot ${action} ${resource}`);
+  }
+}
+
+
+To add a new policy to the database, you can use the following SQL statement:
+
+
+async function addPolicy(ptype, ...args) {
+  const values = args.map((arg) => `'${arg}'`).join(',');
+
+  await sql.query(`INSERT INTO casbin_policy (ptype, v0, v1, v2, v3, v4, v5) VALUES ('${ptype}',${values})`);
+}
+Example usage: await addPolicy('p', 'alice', 'data1', 'read');
+
+To remove a policy from the database, you can use the following SQL statement:
+
+
+async function removePolicy(ptype, ...args) {
+  const values = args.map((arg) => `'${arg}'`).join(',');
+
+  await sql.query(`DELETE FROM casbin_policy WHERE ptype='${ptype}' AND v0='${args[0]}' AND v1='${args[1]}'
+
+Authorization with Casbin and Node.js
+Casbin is a powerful and flexible access control library that supports various access control models, including Role-Based Access Control (RBAC). In this document, we will explore how to use Casbin with Node.js to implement RBAC authorization for an API.
+
+Prerequisites
+Before we get started, you will need to have the following:
+
+Node.js installed on your system
+A Microsoft SQL Server database (or another database supported by Casbin) to store the policy
+Step 1: Install dependencies
+To use Casbin with Node.js, you will need to install the casbin package:
+
+
+npm install casbin
+Step 2: Define the policy
+To define the policy, you will need to create a model.conf file that defines the access control model and a policy.csv file that specifies the permissions for each role.
+
+Here's an example model.conf file that defines a basic RBAC model:
+
+
+[request_definition]
+r = sub, obj, act
+
+[policy_definition]
+p = sub, obj, act
+
+[role_definition]
+g = _, _
+
+[policy_effect]
+e = some(where (p.eft == allow))
+
+[matchers]
+m = g(r.sub, p.sub) && r.obj == p.obj && r.act == p.act
+And here's an example policy.csv file that grants admin and user roles different permissions:
+
+
+p,user,data/read,*
+p,admin,data/write,*
+In this policy, users with the user role are allowed to read data, while users with the admin role are allowed to write data.
+
+Step 3: Connect to the database
+To connect to the database, you will need to install a database adapter for Casbin that supports your database. In this example, we will use the casbin-mssql-adapter package to connect to a Microsoft SQL Server database:
+
+
+npm install casbin-mssql-adapter
+To connect to the database, you can use the following code:
+
+
+const { SequelizeAdapter } = require('casbin-mssql-adapter');
+
+const adapter = await SequelizeAdapter.newAdapter({
+  username: 'username',
+  password: 'password',
+  host: 'localhost',
+  database: 'casbin',
+  dialect: 'mssql',
+});
+This code creates a new SequelizeAdapter instance and connects to a Microsoft SQL Server database with the specified credentials.
+
+Step 4: Create the enforcer
+To create the enforcer instance, you can use the following code:
+
+
+const casbin = require('casbin');
+
+const enforcer = await casbin.newEnforcer('model.conf', adapter);
+This code creates a new Enforcer instance with the model.conf file and the database adapter.
+
+Step 5: Check authorization
+To check authorization, you can use the enforce method of the enforcer instance:
+
+
+const allowed = await enforcer.enforce(subject, resource, action);
+In this code, subject is the user ID, resource is the resource being accessed (e.g. /data/123), and action is the action being performed (e.g. read).
+
+If the user is authorized to perform the action on the resource, allowed will be true. Otherwise, it will be false.
+
+Step 6: Implement authorization in the API
+To implement authorization in the API, you can use the `enforce
+
+// Define a middleware function to check authorization
+async function checkAuthorization(req, res, next) {
+  const subject = req.headers['x-user-id'];
+  const resource = req.baseUrl + req.route.path;
+  const action = req.method.toLowerCase();
+
+  try {
+    await enforce(subject, resource, action);
+    next();
+  } catch (err) {
+    console.error(err);
+    res.status(403).send(err.message);
+  }
+}
+/ Middleware to check if user is authorized to access a route
+const authMiddleware = async (req: any, res: any, next: any) => {
+  const userId = req.user.id;
+
+  // Get the roles for the user
+  const roles = await getUserRoles(userId);
+
+  // Check if the user is authorized to access the resource
+  const authorized = await enforcer.enforce(roles, req.route.path, req.method);
+
+  if (authorized) {
+    next();
+  } else {
+    res.status(403).send('Unauthorized');
+  }
+};
+
+
