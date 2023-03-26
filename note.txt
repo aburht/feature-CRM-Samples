@@ -1,2 +1,87 @@
-note.txt
+import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
+import https from 'https';
+
+interface RequestOptions {
+  url: string;
+  method?: 'get' | 'post' | 'put' | 'delete';
+  data?: any;
+  params?: any;
+  headers?: Record<string, string>;
+  ca?: string;
+  cert?: string;
+  passphrase?: string;
+}
+
+class HttpClient {
+  private client: AxiosInstance;
+
+  constructor() {
+    this.client = axios.create();
+  }
+
+  async request<T>(options: RequestOptions): Promise<T> {
+    const { url, method = 'get', data, params, headers, ca, cert, passphrase } = options;
+    const httpsAgentOptions: https.AgentOptions = {};
+    if (ca) {
+      httpsAgentOptions.ca = ca;
+    }
+    if (cert) {
+      httpsAgentOptions.cert = cert;
+    }
+    if (passphrase) {
+      httpsAgentOptions.passphrase = passphrase;
+    }
+    const config: AxiosRequestConfig = {
+      url,
+      method,
+      data,
+      params,
+      headers,
+      httpsAgent: new https.Agent(httpsAgentOptions),
+    };
+    const response = await this.client.request<T>(config);
+    return response.data;
+  }
+
+  async get<T>(url: string, params?: any, headers?: Record<string, string>, ca?: string, cert?: string, passphrase?: string): Promise<T> {
+    return await this.request<T>({ url, method: 'get', params, headers, ca, cert, passphrase });
+  }
+
+  async post<T>(url: string, data?: any, headers?: Record<string, string>, ca?: string, cert?: string, passphrase?: string): Promise<T> {
+    return await this.request<T>({ url, method: 'post', data, headers, ca, cert, passphrase });
+  }
+
+  async put<T>(url: string, data?: any, headers?: Record<string, string>, ca?: string, cert?: string, passphrase?: string): Promise<T> {
+    return await this.request<T>({ url, method: 'put', data, headers, ca, cert, passphrase });
+  }
+
+  async delete<T>(url: string, params?: any, headers?: Record<string, string>, ca?: string, cert?: string, passphrase?: string): Promise<T> {
+    return await this.request<T>({ url, method: 'delete', params, headers, ca, cert, passphrase });
+  }
+}
+
+
+import { Request, Response } from 'express';
+import { HttpClient } from './http-client';
+
+export async function createUser(req: Request, res: Response) {
+  try {
+    const userData = req.body;
+    const httpClient = new HttpClient();
+
+    const response = await httpClient.post<User>('/users', userData);
+
+    res.status(201).json(response);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+}
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
 
